@@ -15,7 +15,7 @@ The only things you need are:
 
 # Software
 
-[Example code](code/balance_bot.py) is provided if you just want to get your robot balancing right away! Though it's also fun to write your own code from scratch to exercise your control theory and programming skills!
+[Example code](code/balance_bot.py) is provided if you just want to get your robot balancing right away, though it's also fun to write your own code from scratch to exercise your control theory and programming skills! If you need a guide, or you're an educator looking for content to reference, take a look a the [tutorial here](tutorial.md).
 
 # Expansion Ideas
 

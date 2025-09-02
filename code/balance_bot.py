@@ -70,17 +70,17 @@ while(True):
     turn_effort = 0
     
     # Reset loop timer
-    last_loop_time = time.ticks_ms()
+    last_loop_ticks_ms = time.ticks_ms()
 
     # Balance loop
     while(True):
         # Wait until the loop period has passed to ensure the loop runs at a
         # consistent rate
-        if(time.ticks_ms() < last_loop_time + (loop_period * 1000)):
+        if(time.ticks_ms() < last_loop_ticks_ms + (loop_period * 1000)):
             continue
 
         # Update loop timer
-        last_loop_time += loop_period * 1000
+        last_loop_ticks_ms += loop_period * 1000
 
         # Update sensor values
         angle = imu.get_pitch() - angle_offset
