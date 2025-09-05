@@ -1,8 +1,8 @@
 # 1 - XRP Balance Bot Tutorial
 
-This tutorial was created as a guide for anyone wanting to write code for the XRP Balance Bot from scratch. It's intended for anyone who needs help getting started, or for educators needing content to reference. There are many valid solutions to this problem, each with their own benefits and downsides. This tutorial implements the solution from the provided [example code](code/balance_bot.py), which was developed to be relatively easy to understand and follow while providing decent performance that should work for most situations. If you prefer another solution, go for it!
+This tutorial acts as a guide for anyone wanting to write code for the XRP Balance Bot from scratch. It's intended for anyone who needs help getting started, or for educators needing content to reference. There are many valid solutions to this problem, each with their own benefits and downsides. This tutorial implements the solution from the provided [example code](code/balance_bot.py), which was developed to be relatively easy to understand and follow while providing decent performance that should work for most situations. If you prefer another solution, go for it!
 
-This tutorial assumes you already have experience with the base XRP robot, and are comfortable reading and writing code in Python using basic programming concepts like loops, conditionals, and arithmetic. It utilizes sensors including the drive wheel encoders, gyroscope, and accelerometer. It introduces the PID controller, which is the foundational concept used to keep the robot balanced.
+This tutorial assumes you already have experience with the base XRP robot, and are comfortable reading and writing code in Python using basic programming concepts like loops, conditionals, and arithmetic. It utilizes sensors including the drive wheel encoders, gyroscope, and accelerometer. It introduces the PID controller, an industry standard closed-loop feedback control implementation, which is the foundational control theory concept used to keep the robot balanced.
 
 # 2 - Theory
 
@@ -18,19 +18,29 @@ Accelerometers measure acceleration, and there is one built into IMU on the XRP 
 
 ## 2.3 - Gyroscope
 
-Gyroscopes measure rotation, and there is one built into IMU on the XRP Control Board with 3 axes. You may have already used `imu.get_yaw()` with a normal XRP to get the _yaw_ angle of the robot to drive around. However for the balance bot, we want to measure the _pitch_ angle.
+Gyroscopes measure rotation, and there is one built into IMU on the XRP Control Board with 3 axes. You may have already used `imu.get_yaw()` with a normal XRP to get the _yaw_ angle of the robot to drive around. However for the balance bot, we want to measure the _pitch_ angle with `imu.get_pitch()`.
 
 For gyroscopes to get the most accurate measurement, they have to run a brief calibration routine, which happens automatically every time your code calls `from XRPLib.defaults import *`. During the calibration, the IMU needs to be _completely stationary_ to get an accurate calibration, so you should leave the robot lying on the ground until the calibration is done.
 
-## 2.4 Center of Mass
+## 2.4 Center of Mass/Gravity
 
-If you were to cut the robot into lots of tiny pieces, each has a small amount of mass. Gravity pulls on each tiny piece with a force that's proportional to the mass of that piece. Gravity pull each piece in the same direction (down), but at different locations. If we computed the average location of these forces weighted by the mass of piece, the average location is what's called the center of mass. We can simplify this model by assuming all of the gravitational force is applied at this one single point.
+If you were to cut the robot into lots of tiny pieces, each has a small amount of mass. Gravity pulls on each tiny piece with a force that's proportional to the mass of that piece.
 
-The diagrams and code assume the center of mass is perfectly in the center of the XRP for simplicity. But in reality, it's a bit further down (when the XRP is lying down) due to the heavy batteries. So for the XRP Balance Bot to be properly balanced, it has to lean back slightly.
+![img](images/balance_bot_pieces.png)
+
+Gravity pull each piece in the same direction (down), but at different locations. If we computed the average location of these forces weighted by the mass of piece, the average location is what's called the center of gravity (COG) or center of mass (COM). We can simplify this model by assuming all of the gravitational force is applied at this one single point.
+
+![img](images/balance_bot_com_cog.png)
+
+The diagrams illustrate the center of mass is perfectly in the center of the XRP for simplicity. But in reality, it's a bit further down and closer to the wheels due to the heavy batteries. So for the XRP Balance Bot to be properly balanced, it has to lean back slightly.
 
 ## 2.5 - PID Controller
 
-A PID controller is a type of "closed loop feedback control", which in this case is used to keep the robot balanced. There are a lot of resources online about PID control, so we're not going into detail here. If you're not familar with it and want to learn more, the list below links to a few different resources that each explain PID controllers in different ways (there are many more resources if you don't like any of these!):
+A PID controller is a type of "closed-loop feedback control", which in this case is used to keep the robot balanced.
+
+![img](images/feedback_control.png)
+
+There are a lot of resources online about PID control, so we're not going into detail here. If you're not familar with it and want to learn more, the list below links to a few different resources that each explain PID controllers in different ways (there are many more resources if you don't like any of these!):
 
 * [Wikipedia](https://en.wikipedia.org/wiki/Proportional%E2%80%93integral%E2%80%93derivative_controller)
 * [Demo video](https://www.youtube.com/watch?v=qKy98Cbcltw)
@@ -54,13 +64,33 @@ You don't necessarily need to know the details of how PID controllers work for t
 
 ## 2.6 Balance Algorithm
 
-If the center of mass is perfectly above the drive wheels, then the robot is balanced; we'll consider this to be a pitch angle of 0 degrees. The gyroscope can be used to measure the pitch angle, however the gyroscope will report 0 degrees when it was calibrated while lying down on the ground. So there is going to be an offset angle between what the gyroscope reports and our ideal 0 degree balanced angle (it's a bit over 90 degrees for the XRP Balance Bot).
+If the center of mass is perfectly above the drive wheels, then the robot is balanced; we'll consider this to be a pitch angle of 0 degrees.
 
-If the robot leans forward slightly, then gravity pulls down on the center of mass, creating a torque that causes the robot to lean forward more, until it would eventually fall over. To prevent that, we need to spin the drive motors to create an opposite torque to keep the center of mass above the wheels. This is where the PID controller comes in; if we measure some error in the pitch angle, the PID controller tells you how much motor effort is needed to correct it.
+![img](images/balance_bot_vertical.png)
+
+The IMU's gyroscope can be used to measure the pitch angle, however the gyroscope will report 0 degrees when it was calibrated while lying down on the ground. So there is going to be an offset angle between what the gyroscope reports and our ideal 0 degree balanced angle (it's a bit over 90 degrees for the XRP Balance Bot).
+
+![img](images/balance_bot_offset_angle.png)
+
+If the robot leans forward slightly, then gravity pulls down on the center of mass, creating a torque that causes the robot to lean forward more, until it would eventually fall over.
+
+![img](images/balance_bot_lean_forward.png)
+
+To prevent that, we need to spin the drive motors to create an opposite torque to keep the center of mass above the wheels.
+
+![img](images/balance_bot_wheel_spin.png)
+
+This is where the PID controller comes in! If we measure some error in the pitch angle, the PID controller tells you how much motor effort is needed to correct it.
+
+![img](images/balance_bot_error_effort.png)
 
 This idea works if our target angle is perfectly above the drive wheels, but it will probably be a few degrees off from that ideal angle. In that case, the PID controller would tell us that we need to constantly increase the motor effort to maintain that slightly incorrect angle. The robot would zoom off in one direction and we'd quickly reach the maximum motor effort, at which point the robot would just fall over.
 
-To fix that, we need a way to correct the target angle closer to the ideal angle. There are a few ways to do this, but the solution presented here is to use a second PID controller based on the drive motor encoders! If it detects that the robot is starting to zoom off in one direction, it can adjust the target angle in the other direction. This has the added benefit of keeping the robot in roughly the same location while it's balancing.
+![img](images/balance_bot_wrong_target.png)
+
+To fix that, we need a way to correct the target angle to the ideal angle. There are a few ways to do this, but the solution presented here is to use a second PID controller based on the drive motor encoders! If it detects that the robot is traveling, it can adjust the target angle in the other direction. This has the added benefit of keeping the robot in roughly the same location while it's balancing.
+
+![img](images/balance_bot_fix_target.png)
 
 To keep track of the 2 PID controllers, we'll call the first one the "angle PID controller" since it maintains the pitch angle of the robot, and the second one the "position PID controller" since it maintains the position of the robot.
 
@@ -118,7 +148,7 @@ Before implementing the balance code and making motors spin, we should first add
 
 There are multiple ways to detect when the robot stands up. For example, you could wait until the pitch angle gets close enough to the offset angle, if you know what that angle is. However, the recommended solution is use the accelerometer to detect a vertical orientation (which is how modern phones and tablets switch between landscape and portait orientations!). The simplest solution is to wait for the z-axis of the accelerometer to get close enough to 0.
 
-Once that happens, we should record the pitch angle measured by the gyroscope and store that as the offset angle. Within the main balance loop, we can subtract that offset angle from the measured angle to get our desired pitch angle measurement relative to the ideal vertical pitch angle.
+Once that happens, we should record the pitch angle measured by the IMU's gyroscope and store that as the offset angle. Within the main balance loop, we can subtract that offset angle from the measured angle to get our desired pitch angle measurement relative to the ideal vertical pitch angle.
 
 At the end of the main balance loop, we can look at the angle to see if it has exceeded some threshold angle, which implies that the robot has fallen over. In that case, we want to stop the drive motors and break out of the balance loop.
 
