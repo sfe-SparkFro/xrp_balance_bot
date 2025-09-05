@@ -6,7 +6,8 @@ This tutorial assumes you already have experience with the base XRP robot, and a
 
 # 2 - Theory
 
-This section covers the theoretical concepts and ideas used in the XRP Balance Bot, and is broken into subsections. The subsections cover the sensors used for this project, physics concepts, and relevant control theory.
+> [!NOTE]
+> This section covers the theoretical concepts and ideas used in the XRP Balance Bot, and is broken into subsections. The subsections cover the sensors used for this project, physics concepts, and relevant control theory.
 
 ## 2.1 - Encoder
 
@@ -20,7 +21,8 @@ Accelerometers measure acceleration, and there is one built into IMU on the XRP 
 
 Gyroscopes measure rotation, and there is one built into IMU on the XRP Control Board with 3 axes. You may have already used `imu.get_yaw()` with a normal XRP to get the _yaw_ angle of the robot to drive around. However for the balance bot, we want to measure the _pitch_ angle with `imu.get_pitch()`.
 
-For gyroscopes to get the most accurate measurement, they have to run a brief calibration routine, which happens automatically every time your code calls `from XRPLib.defaults import *`. During the calibration, the IMU needs to be _completely stationary_ to get an accurate calibration, so you should leave the robot lying on the ground until the calibration is done.
+> [!IMPORTANT]
+> For gyroscopes to get the most accurate measurement, they have to run a brief calibration routine, which happens automatically every time your code calls `from XRPLib.defaults import *`. During the calibration, the IMU needs to be _completely stationary_ to get an accurate calibration, so you should leave the robot lying on the ground until the calibration is done.
 
 ## 2.4 Center of Mass/Gravity
 
@@ -32,7 +34,8 @@ Gravity pull each piece in the same direction (down), but at different locations
 
 ![img](images/balance_bot_com_cog.png)
 
-The diagrams illustrate the center of mass is perfectly in the center of the XRP for simplicity. But in reality, it's a bit further down and closer to the wheels due to the heavy batteries. So for the XRP Balance Bot to be properly balanced, it has to lean back slightly.
+> [!NOTE]
+> The diagrams illustrate the center of mass is perfectly in the center of the XRP for simplicity. But in reality, it's a bit further down and closer to the wheels due to the heavy batteries. So for the XRP Balance Bot to be properly balanced, it has to lean back slightly.
 
 ## 2.5 - PID Controller
 
@@ -92,11 +95,13 @@ To fix that, we need a way to correct the target angle to the ideal angle. There
 
 ![img](images/balance_bot_fix_target.png)
 
-To keep track of the 2 PID controllers, we'll call the first one the "angle PID controller" since it maintains the pitch angle of the robot, and the second one the "position PID controller" since it maintains the position of the robot.
+> [!NOTE]
+> To keep track of the 2 PID controllers, we'll call the first one the "angle PID controller" since it maintains the pitch angle of the robot, and the second one the "position PID controller" since it maintains the position of the robot.
 
 # 3 - Implementation
 
-This section works through how to implement the code. It is broken into subsections, first setting up the overall code structure, then adding code into relevant places within that structure. Solution code is included at the end of each subsection as collapsible content, like so:
+> [!NOTE]
+> This section works through how to implement the code. It is broken into subsections, first setting up the overall code structure, then adding code into relevant places within that structure. Solution code is included at the end of each subsection as collapsible content, like so:
 
 <details>
 <summary>Click to reveal solution code</summary>
@@ -112,9 +117,33 @@ This section works through how to implement the code. It is broken into subsecti
 
 ## 3.1 Code Structure
 
-At the start of the code, you'll need to import all required libraries, and initialize any constants and variables. When XRPLib is imported, it calibrates the IMU, during which the robot should be lying on the ground completely stationary. The XRP Balance Bot isn't able to stand itself up from this position, so you'll need to help it by rotating it up to the balance point, at which point the main balance loop starts. The main balance loop should measure the sensor values, update the PID controllers, and set the drive motor efforts. If it detects that the robot has fallen over, we should stop the motors and break out of the main balance loop.
+It's helpful to first think about the structure of your code before implementing anything, which can be done with psuedocode! Here is an example:
+
+* Import required libraries
+* Initialize constants
+* Wait for robot to stand up
+* Initialize variables
+* Main balance loop
+    * Measure sensor values
+    * Update PID controllers
+    * Set motor efforts
+    * If robot has fallen over, stop motors and break out of loop
+
+> [!IMPORTANT]
+> When XRPLib is imported, it calibrates the IMU, during which the robot should be lying on the ground completely stationary. The XRP Balance Bot isn't able to stand itself up from this position, so you'll need to rotate it up to the balance point by hand. 
 
 As is, the robot will attempt to balance one time, then stop all code execution once it falls over. If you want to test multiple times, it's easier to nest some code in a second loop that runs forever, so you don't need to re-run the code each time.
+
+* Import required libraries
+* Initialize constants
+* Loop
+    * Wait for robot to stand up
+    * Initialize variables
+    * Main balance loop
+        * Measure sensor values
+        * Update PID controllers
+        * Set motor efforts
+        * If robot has fallen over, stop motors and break out of loop
 
 <details>
 <summary>Click to reveal solution code</summary>
@@ -145,17 +174,20 @@ As is, the robot will attempt to balance one time, then stop all code execution 
 
 ## 3.2 Entering and Exiting the Main Balance Loop
 
-Before implementing the balance code and making motors spin, we should first add the code to detect when the robot stands up and when it has fallen over. That way we know when it is safe to start spinning the motors and when they need to stop, because we probably won't get things right the first time, and we don't want the robot to drive off uncontrollably!
+> [!WARNING]
+> When we attempt to implement the PID controller and spin the motors, we probably won't get it right the first time. In fact, it will probably require a lot of iterations to get it right! So it would be best to first make sure the main balance loop waits to start until we stand up the robot, and breaks out of the loop when the robot falls over. Otherwise the robot may drive off uncontrollably!
 
-There are multiple ways to detect when the robot stands up. For example, you could wait until the pitch angle gets close enough to the offset angle, if you know what that angle is. However, the recommended solution is use the accelerometer to detect a vertical orientation (which is how modern phones and tablets switch between landscape and portait orientations!). The simplest solution is to wait for the z-axis of the accelerometer to get close enough to 0.
+There are multiple ways to detect when the robot stands up. For example, you could wait until the pitch angle gets close enough to the offset angle, if you know what that angle is. However, the solution implemented here is use the accelerometer to detect a vertical orientation (which is how modern phones and tablets switch between landscape and portait orientations!). The simplest solution is to wait for the z-axis of the accelerometer to get close enough to 0. The measurement can be acquired with `imu.get_acc_z()`, which returns a value in milli-g.
 
-Once that happens, we should record the pitch angle measured by the IMU's gyroscope and store that as the offset angle. Within the main balance loop, we can subtract that offset angle from the measured angle to get our desired pitch angle measurement relative to the ideal vertical pitch angle.
+Once that happens, we should record the pitch angle measured by the IMU's gyroscope with `imu.get_pitch()` and store that as the offset angle. Within the main balance loop, we can subtract that offset angle from the measured angle to get our desired pitch angle measurement relative to the ideal vertical pitch angle.
 
-At the end of the main balance loop, we can look at the angle to see if it has exceeded some threshold angle, which implies that the robot has fallen over. In that case, we want to stop the drive motors and break out of the balance loop.
+At the end of the main balance loop, we can look at the angle to see if it has exceeded some threshold angle, which implies that the robot has fallen over. In that case, we want to stop the drive motors with `drivetrain.stop()` and break out of the balance loop with `break`.
 
-It's a good idea to add some print statements at each transition so we can track when each thing happens. You can also make the on board LED illuminate to indicate whether it's waiting to stand up, or is within the balance loop.
+> [!NOTE]
+> It's a good idea to add some print statements at each transition so we can track when each thing happens. You can also make the on board LED illuminate to indicate whether it's waiting to stand up, or is within the balance loop; LEDs are sometimes easier to see than a print statement! If your XRP has an RGB LED, it can be set with `board.set_rgb_led(r, g, b)` where `r`, `g`, and `b` can be any integer from 0 to 255.
 
-Once done, test your code to verify that it starts the main balance loop when stood up, and breaks out of the loop when it falls over. If it doesn't work properly, your robot will likely drive away uncontrollably, so this is an important step!
+> [!WARNING]
+> Once done, test your code to verify that it starts the main balance loop when stood up, and breaks out of the loop when it falls over. If it doesn't work properly, your robot might drive away uncontrollably later, so this is an important step!
 
 <details>
 <summary>Click to reveal solution code</summary>
@@ -286,14 +318,27 @@ angle_pid = PID(
     kd = <insert number>,
     max_output = <insert number>
 )
+
+# Update the PID controller with the error to get the new output value
+output = angle_pid.update(angle_error)
 ```
 
-You'll need to replace each `<insert number>` with actual numbers. For `kp`, `ki`, and `kd`, you'll need to tune these numbers by testing. For `max_output`, you'll need to pick a reasonable value (what's the maximum effort a motor can exert?).
+You'll need to replace each `<insert number>` with actual numbers. For `kp`, `ki`, and `kd`, you'll need to tune these numbers by testing (see tips below). For `max_output`, you'll need to pick a reasonable value (what's the maximum effort a motor can exert?).
+
+> [!IMPORTANT]
+> You should call `angle_pid.clear_history()` right before entering the main balance loop to ensure the history from the previous balance attempt does not affect the current balance attempt.
+
+Once you've implemented your PID code, it's time to test! Run your code, stand up your robot by hand, and see how it behaves. Based on its behavior, try changing `kp`, `ki`, or `kd` to see how that affects the behavior. Keep changing the values until can hold the angle by itself!
+
+> [!WARNING]
+> Your robot will probably fall over a lot during this phase! To prevent damage, be ready to catch it. Be aware that the robot may behave very unpredictably; it may simply fall, or it may actively throw itself to the ground!
 
 <details>
 <summary>Tips for PID tuning</summary>
 
 Start by rough tuning `kp`, because it does the majority of the work; leave `ki` and `kd` at 0. Don't fine tune anything until all 3 values have been rough tuned.
+
+Once `kp` is rough tuned, move on to either `ki` or `kd` depending on how your robot is behaving. If it doesn't hold the angle well, try working on `ki`. If there are dramatic oscillations, try working on `kd`.
 
 * `kp`
     * Pick a number!
@@ -319,7 +364,7 @@ Start by rough tuning `kp`, because it does the majority of the work; leave `ki`
     * Increase or decrease `ki`.
         * Similar to `kp`, start with 10x changes until you go too far, then narrow in.
     * Repeat until you get close.
-        * Again, don't spend much time fine tuning until `kp` and `ki` are rough tuned.
+        * Again, don't spend much time fine tuning until both `kp` and `kd` are rough tuned.
 * `kd`
     * Start with 0 until `kp` has been tuned.
     * Pick a number!
@@ -330,12 +375,14 @@ Start by rough tuning `kp`, because it does the majority of the work; leave `ki`
     * Increase or decrease `ki`.
         * Similar to `kp`, start with 10x changes until you go too far, then narrow in.
     * Repeat until you get close.
-        * Again, don't spend much time fine tuning until `kp` and `ki` are rough tuned.
+        * Again, don't spend much time fine tuning until both `kp` and `ki` are rough tuned.
 
-PID tuning can be a very iterative process, with lots of time spent testing, tweaking numbers, and testing again. Be prepared for your robot to fall over _a lot_ (and be ready to catch it!), this is normal. It can also be tricky to know whether the changes you're making are making things better or worse, which is also normal. If you get lost, try resetting `ki` and `kd` to 0, and focus on `kp` first because it does the majority of the work.
+> [!NOTE]
+> PID tuning can be a very iterative process, with lots of time spent testing, tweaking numbers, and testing again. Be prepared for your robot to fall over _a lot_ (and be ready to catch it!), this is normal. It can also be tricky to know whether the changes you're making are making things better or worse, which is also normal. If you get lost, try resetting `ki` and `kd` to 0, and focus on `kp` first because it does the majority of the work.
 </details>
 
-Keep in mind that the angle PID controller is not actually trying to keep the robot balanced, it's trying to hold the robot at the specified angle. That angle is ideally the perfect balance angle, but it's probably wrong, so you should always expect the robot to zoom off in one direction until the max motor effort is reached, and it falls over. If you get to that point, you're doing great! Then it's time to add the second PID controller.
+> [!IMPORTANT]
+> Keep in mind that the angle PID controller is not actually trying to keep the robot balanced, it's trying to hold the robot at the specified angle. That angle is ideally the perfect balance angle, but it may be wrong, so you should expect the robot to drive off in one direction until the max motor effort is reached and it falls over. If you get to that point, you're doing great! Then it's time to add the second PID controller.
 
 <details>
 <summary>Click to reveal solution code</summary>
@@ -423,7 +470,15 @@ Keep in mind that the angle PID controller is not actually trying to keep the ro
 
 ## 3.5 Position PID Controller
 
-The position PID controller is implemented just like the angle PID controller, but the input is the robot position as measured by the drive motor encoders.
+Now it's time to implement the position PID controller! It's implemented just like the angle PID controller, but the input is the robot position as measured by the drive motor encoders, and the output is the target angle. The primary function is to correct the target angle being off from the ideal angle, but it has a secondary effect of keeping the robot in the same location.
+
+The tuning process is the same as the angle PID controller. `kp`, `ki`, and `kd` all have the same effect, except they apply to the position of the robot instead of its angle. Keep testing with different values until your robot can stand up by itself forever!
+
+> [!NOTE]
+> It may be helpful to set the drivetrain wheel diameter to properly reflect the large wheels. For example, if you have 10cm diameter wheels, use `drivetrain.wheel_diam = 10`.
+
+> [!IMPORTANT]
+> You should call `drivetrain.reset_encoder_position()` right before entering the main balance loop to ensure the encoder values from the previous balance attempt do not affect the current balance attempt.
 
 <details>
 <summary>Click to reveal solution code</summary>
@@ -539,9 +594,14 @@ The position PID controller is implemented just like the angle PID controller, b
 ```
 </details>
 
-## 3.6 Drive Inputs
+## 3.6 Remote Control Driving
 
-If you've got your robot balancing, you'll probably want to drive it around, right? For that, we can do a couple simple modifications to allow a forward speed input, and a turn effort input. These values could be set by gamepad inputs or similar, it's up to you!
+If you want to have even more fun with your balance bot, you can implement remote control driving with a gamepad! This requires only a couple simple modifications:
+
+* To move forward and backward, change the target of the position PID controller.
+    * You can increment `target_position` by a small amount each loop period proportional to the y-axis of the gamepad joystick.
+* To turn, use differential motor power.
+    * This is implemented most simply with `drivetrain.arcade(forward_effort, turn_effort)`, where `turn_effort` is proportional to the x-axis of the gamepad joystick.
 
 <details>
 <summary>Click to reveal solution code</summary>
